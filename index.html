@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f1115;
+            color: #e2e8f0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .glass-panel {
+            background: rgba(30, 33, 40, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
+        /* Normal Input (Untuk API Key) */
+        .custom-input {
+            color: #f8fafc !important; 
+            background-color: #1e293b !important; 
+        }
+        .custom-input::placeholder {
+            color: #94a3b8 !important;
+        }
+
+        /* ===== STEALTH / ANON INPUT MODE ===== */
+        .anon-input {
+            background-color: #1e293b !important; /* Warna latar gelap */
+            color: transparent !important; /* Membuat teks benar-benar tidak terlihat */
+            caret-color: #e11d48 !important; /* Kursor (garis ketik) tetap terlihat agar user tidak bingung */
+        }
+        .anon-input::placeholder {
+            color: #475569 !important; /* Placeholder dibuat sangat redup */
+        }
+        
+        /* Menghilangkan efek warna saat teks di-drag / diblok */
+        .anon-input::selection {
+            background-color: transparent !important;
+            color: transparent !important;
+        }
+        .anon-input::-moz-selection {
+            background-color: transparent !important;
+            color: transparent !important;
+        }
+
+        /* Image Upload Box Styles */
+        .upload-box {
+            position: relative;
+            border: 2px dashed #4b5563;
+            border-radius: 0.5rem;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background-color: #1f2937;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .upload-box:hover {
+            border-color: #e11d48;
+            background-color: #374151;
+        }
+        .upload-box input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .upload-preview {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            z-index: 10;
+        }
+        .clear-img-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            z-index: 20;
+            cursor: pointer;
+        }
+        .hidden-el { display: none !important; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="glass-panel w-full max-w-3xl rounded-2xl p-6 md:p-8 shadow-2xl my-8">
+        
+        <!-- Header -->
+        <div class="mb-6 border-b border-gray-700 pb-4">
+            <h1 class="text-3xl font-bold text-white tracking-wide">Crimson Cloud <span class="text-rose-500">Studio</span></h1>
+        </div>
+
+        <!-- Global API Key -->
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-300 mb-2">Google Gemini API Key</label>
+            <input 
+                type="password" 
+                id="apiKeyInput" 
+                placeholder="Masukkan kunci API Anda (AIzaSy...)" 
+                class="w-full custom-input border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-colors"
+            >
+        </div>
+
+        <!-- Error Notifier -->
+        <div id="errorBox" class="hidden mb-6 p-3 bg-red-500/20 border border-red-500/50 text-red-200 rounded-lg text-sm"></div>
+
+        <!-- Tabs -->
+        <div class="flex space-x-1 border-b border-gray-700 mb-6">
+            <button id="tabTextBtn" class="px-6 py-3 text-sm font-medium text-rose-400 border-b-2 border-rose-500 hover:text-white transition-colors focus:outline-none">
+                Generate Teks
+            </button>
+            <button id="tabImgBtn" class="px-6 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-white transition-colors focus:outline-none">
+                Generate Gambar
+            </button>
+        </div>
+
+        <!-- ================= PANEL TEKS ================= -->
+        <div id="panelText" class="space-y-4 block">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Parameter / Permintaan Sistem (Teks)</label>
+                <!-- KELAS ANON-INPUT DITERAPKAN DI SINI -->
+                <textarea 
+                    id="textInput" 
+                    rows="5" 
+                    placeholder="Ketik permintaan di sini (Teks yang Anda ketik akan disembunyikan)..." 
+                    class="w-full anon-input border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-rose-500 transition-colors resize-none"
+                ></textarea>
+                <!-- Word Count Teks -->
+                <div id="textWordCount" class="text-xs text-rose-400/70 mt-2 text-right font-medium">0 kata terketik</div>
+            </div>
+
+            <button id="executeTextBtn" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 flex justify-center items-center gap-2">
+                <span>Mulai Pemrosesan Data Teks</span>
+                <svg id="loadingText" class="hidden animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </button>
+
+            <!-- Text Result Area -->
+            <div id="textResultWrapper" class="hidden mt-6 pt-6 border-t border-gray-700">
+                <h3 class="text-sm font-medium text-rose-400 mb-3 uppercase tracking-wider">Hasil Eksekusi:</h3>
+                <div id="textResultContainer" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-5 text-gray-100 text-sm whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto"></div>
+            </div>
+        </div>
+
+        <!-- ================= PANEL GAMBAR ================= -->
+        <div id="panelImg" class="space-y-4 hidden-el">
+            
+            <!-- Mode Selector -->
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Mode Generasi Gambar</label>
+                <select id="imageModeSelect" class="w-full custom-input border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-rose-500 transition-colors">
+                    <option value="t2i">Text-to-Image (T2I)</option>
+                    <option value="i2i">Image-to-Image (I2I) dengan Referensi</option>
+                </select>
+            </div>
+
+            <!-- Image Prompt -->
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Prompt Visual</label>
+                <!-- KELAS ANON-INPUT DITERAPKAN DI SINI -->
+                <textarea 
+                    id="imgInput" 
+                    rows="3" 
+                    placeholder="Ketik visual yang diinginkan (Teks tidak akan terlihat)..." 
+                    class="w-full anon-input border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                ></textarea>
+                <!-- Word Count Gambar -->
+                <div id="imgWordCount" class="text-xs text-indigo-400/70 mt-2 text-right font-medium">0 kata terketik</div>
+            </div>
+
+            <!-- 6 Image Reference Slots -->
+            <div id="i2iContainer" class="hidden-el space-y-2">
+                <label class="block text-sm font-medium text-gray-300">Gambar Referensi (Hingga 6)</label>
+                <div class="grid grid-cols-3 sm:grid-cols-6 gap-3" id="uploadGrid">
+                    <!-- Dinamis terisi melalui JS -->
+                </div>
+                <p class="text-xs text-gray-500 mt-1">*Disarankan resolusi ringan. Hanya digunakan saat mode I2I aktif.</p>
+            </div>
+
+            <button id="executeImgBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 flex justify-center items-center gap-2">
+                <span>Render Gambar</span>
+                <svg id="loadingImg" class="hidden animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </button>
+
+            <!-- Image Result Area -->
+            <div id="imgResultWrapper" class="hidden mt-6 pt-6 border-t border-gray-700 flex flex-col items-center justify-center">
+                <h3 class="text-sm font-medium text-indigo-400 mb-3 w-full text-left uppercase tracking-wider">Hasil Render:</h3>
+                <img id="imgResultDisplay" class="max-w-full rounded-lg shadow-lg border border-gray-700" alt="Hasil Generasi" src="">
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const errorBox = document.getElementById('errorBox');
+        
+        // Tabs
+        const tabTextBtn = document.getElementById('tabTextBtn');
+        const tabImgBtn = document.getElementById('tabImgBtn');
+        const panelText = document.getElementById('panelText');
+        const panelImg = document.getElementById('panelImg');
+
+        // Text Elements
+        const textInput = document.getElementById('textInput');
+        const textWordCount = document.getElementById('textWordCount');
+        const executeTextBtn = document.getElementById('executeTextBtn');
+        const loadingText = document.getElementById('loadingText');
+        const textResultWrapper = document.getElementById('textResultWrapper');
+        const textResultContainer = document.getElementById('textResultContainer');
+
+        // Image Elements
+        const imageModeSelect = document.getElementById('imageModeSelect');
+        const imgInput = document.getElementById('imgInput');
+        const imgWordCount = document.getElementById('imgWordCount');
+        const i2iContainer = document.getElementById('i2iContainer');
+        const uploadGrid = document.getElementById('uploadGrid');
+        const executeImgBtn = document.getElementById('executeImgBtn');
+        const loadingImg = document.getElementById('loadingImg');
+        const imgResultWrapper = document.getElementById('imgResultWrapper');
+        const imgResultDisplay = document.getElementById('imgResultDisplay');
+
+        // State untuk menyimpan gambar referensi I2I (maks 6)
+        let referenceImages = Array(6).fill(null);
+
+        // --- Tab Switching Logic ---
+        function switchTab(mode) {
+            errorBox.classList.add('hidden');
+            if (mode === 'text') {
+                tabTextBtn.className = "px-6 py-3 text-sm font-medium text-rose-400 border-b-2 border-rose-500 hover:text-white transition-colors focus:outline-none";
+                tabImgBtn.className = "px-6 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-white transition-colors focus:outline-none";
+                panelText.classList.remove('hidden-el');
+                panelImg.classList.add('hidden-el');
+            } else {
+                tabImgBtn.className = "px-6 py-3 text-sm font-medium text-indigo-400 border-b-2 border-indigo-500 hover:text-white transition-colors focus:outline-none";
+                tabTextBtn.className = "px-6 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-white transition-colors focus:outline-none";
+                panelImg.classList.remove('hidden-el');
+                panelText.classList.add('hidden-el');
+            }
+        }
+        tabTextBtn.addEventListener('click', () => switchTab('text'));
+        tabImgBtn.addEventListener('click', () => switchTab('image'));
+
+        // --- Word Count Logic ---
+        function countWords(str) {
+            str = str.trim();
+            return str === '' ? 0 : str.split(/\s+/).length;
+        }
+        textInput.addEventListener('input', (e) => {
+            textWordCount.textContent = `${countWords(e.target.value)} kata terketik`;
+        });
+        imgInput.addEventListener('input', (e) => {
+            imgWordCount.textContent = `${countWords(e.target.value)} kata terketik`;
+        });
+
+        // --- Mode I2I / T2I Toggle ---
+        imageModeSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'i2i') {
+                i2iContainer.classList.remove('hidden-el');
+            } else {
+                i2iContainer.classList.add('hidden-el');
+            }
+        });
+
+        // --- Build 6 Upload Slots ---
+        for (let i = 0; i < 6; i++) {
+            const box = document.createElement('div');
+            box.className = 'upload-box';
+            box.innerHTML = `
+                <span class="text-xs text-gray-400 text-center px-2">Slot ${i+1}</span>
+                <input type="file" accept="image/*" id="file-${i}">
+                <div class="upload-preview hidden-el" id="preview-${i}"></div>
+                <div class="clear-img-btn hidden-el" id="clear-${i}">&times;</div>
+            `;
+            uploadGrid.appendChild(box);
+
+            const fileInput = box.querySelector(`#file-${i}`);
+            const preview = box.querySelector(`#preview-${i}`);
+            const clearBtn = box.querySelector(`#clear-${i}`);
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const base64Str = event.target.result;
+                    referenceImages[i] = {
+                        mimeType: file.type,
+                        base64: base64Str
+                    };
+                    preview.style.backgroundImage = `url(${base64Str})`;
+                    preview.classList.remove('hidden-el');
+                    clearBtn.classList.remove('hidden-el');
+                };
+                reader.readAsDataURL(file);
+            });
+
+            clearBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                fileInput.value = '';
+                referenceImages[i] = null;
+                preview.style.backgroundImage = '';
+                preview.classList.add('hidden-el');
+                clearBtn.classList.add('hidden-el');
+            });
+        }
+
+        // --- Utility ---
+        function showError(msg) {
+            errorBox.textContent = msg;
+            errorBox.classList.remove('hidden');
+        }
+
+        const MASTER_PROMPT_TEXT = `Kamu adalah sistem kecerdasan buatan tingkat tinggi milik Crimson Cloud Studio. 
+Analisis secara mendalam berdasarkan riset nyata. Hasilkan keluaran yang padat ilmu dan langsung pada struktur intinya.
+[Permintaan Pengguna]:\n`;
+
+        // --- Execute Text Generation ---
+        executeTextBtn.addEventListener('click', async () => {
+            const apiKey = apiKeyInput.value.trim();
+            const userInput = textInput.value.trim();
+
+            errorBox.classList.add('hidden');
+            textResultWrapper.classList.add('hidden');
+            
+            if (!apiKey || !userInput) {
+                showError('Silakan isi API Key dan Parameter Teks terlebih dahulu.');
+                return;
+            }
+
+            executeTextBtn.disabled = true; executeTextBtn.classList.add('opacity-75', 'cursor-not-allowed');
+            loadingText.classList.remove('hidden');
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: MASTER_PROMPT_TEXT + userInput }] }]
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error?.message || 'Gagal terhubung ke API Teks.');
+                
+                textResultContainer.textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || "Tidak ada hasil.";
+                textResultWrapper.classList.remove('hidden');
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                executeTextBtn.disabled = false; executeTextBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                loadingText.classList.add('hidden');
+            }
+        });
+
+        // --- Execute Image Generation ---
+        executeImgBtn.addEventListener('click', async () => {
+            const apiKey = apiKeyInput.value.trim();
+            const promptStr = imgInput.value.trim();
+            const mode = imageModeSelect.value;
+
+            errorBox.classList.add('hidden');
+            imgResultWrapper.classList.add('hidden');
+
+            if (!apiKey || !promptStr) {
+                showError('Silakan isi API Key dan Prompt Visual terlebih dahulu.');
+                return;
+            }
+
+            let activeImages = referenceImages.filter(img => img !== null);
+            if (mode === 'i2i' && activeImages.length === 0) {
+                showError('Mode I2I memerlukan minimal 1 gambar referensi. Silakan unggah atau ubah ke mode T2I.');
+                return;
+            }
+
+            executeImgBtn.disabled = true; executeImgBtn.classList.add('opacity-75', 'cursor-not-allowed');
+            loadingImg.classList.remove('hidden');
+
+            try {
+                let imageUrlToDisplay = '';
+
+                if (mode === 't2i') {
+                    // API Call: Text to Image menggunakan imagen-4.0
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                    const payload = {
+                        instances: { prompt: promptStr },
+                        parameters: { sampleCount: 1 }
+                    };
+                    
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.error?.message || 'Gagal memproses gambar T2I.');
+
+                    if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
+                        imageUrlToDisplay = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+                    } else {
+                        throw new Error('Respons format gambar T2I tidak dikenali.');
+                    }
+
+                } else if (mode === 'i2i') {
+                    // API Call: Image to Image menggunakan gemini-2.5-flash-image-preview
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
+                    
+                    let partsArray = [{ text: promptStr }];
+                    activeImages.forEach(img => {
+                        const base64Data = img.base64.split(',')[1];
+                        partsArray.push({
+                            inlineData: { mimeType: img.mimeType, data: base64Data }
+                        });
+                    });
+
+                    const payload = {
+                        contents: [{ parts: partsArray }],
+                        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+                    };
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.error?.message || 'Gagal memproses gambar I2I.');
+
+                    const imagePart = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+                    if (imagePart && imagePart.inlineData && imagePart.inlineData.data) {
+                        imageUrlToDisplay = `data:image/png;base64,${imagePart.inlineData.data}`;
+                    } else {
+                        throw new Error('Tidak ada data gambar balasan (I2I) yang ditemukan dari server.');
+                    }
+                }
+
+                // Tampilkan gambar
+                imgResultDisplay.src = imageUrlToDisplay;
+                imgResultWrapper.classList.remove('hidden');
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                executeImgBtn.disabled = false; executeImgBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                loadingImg.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
